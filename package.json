@@ -20,7 +20,6 @@
     "bcrypt": "^6.0.0",
     "dotenv": "^17.1.0",
     "fastify": "^5.4.0",
-    "fastify-type-provider-zod": "^5.0.2",
     "jsonwebtoken": "^9.0.2",
     "mssql": "^11.0.1",
     "nodemailer": "^7.0.5",
