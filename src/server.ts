@@ -7,6 +7,8 @@ import { getConnection, closeConnection } from './config/database';
 
 // Import routes
 import authRoutes from './routes/auth';
+import jobPostingRoutes from './routes/jobPosting';
+import consultantServiceRoutes from './routes/consultantService';
 // import consultantRoutes from './routes/consultant';
 // import clientRoutes from './routes/client';
 
@@ -34,7 +36,7 @@ const start = async () => {
 
     // Register CORS
     await fastify.register(cors, {
-      origin: [config.frontend.url, 'http://localhost:3000'],
+      origin: [config.frontend.url, 'http://localhost:5000'],
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
@@ -89,6 +91,8 @@ const start = async () => {
         endpoints: {
           health: '/health',
           auth: '/api/auth/*',
+          jobs: '/api/jobs/*',
+          consultantServices: '/api/consultant-services/*',
           consultant: '/api/consultant/*',
           client: '/api/client/*',
         },
@@ -98,6 +102,9 @@ const start = async () => {
 
     // Register route modules
     await fastify.register(authRoutes, { prefix: '/api/auth' });
+    await fastify.register(jobPostingRoutes, { prefix: '/api/jobs' });
+    await fastify.register(consultantServiceRoutes, { prefix: '/api/consultant-services' });
+
     // await fastify.register(consultantRoutes, { prefix: '/api/consultant' });
     // await fastify.register(clientRoutes, { prefix: '/api/client' });
 
@@ -153,6 +160,22 @@ const start = async () => {
           'POST /api/auth/login-consultant',
           'POST /api/auth/register-client',
           'POST /api/auth/register-consultant',
+          'GET /api/jobs',
+          'POST /api/jobs',
+          'GET /api/jobs/:id',
+          'PUT /api/jobs/:id',
+          'DELETE /api/jobs/:id',
+          'GET /api/jobs/stats',
+          'GET /api/jobs/search',
+          'GET /api/consultant-services',
+          'POST /api/consultant-services',
+          'GET /api/consultant-services/:id',
+          'PUT /api/consultant-services/:id',
+          'DELETE /api/consultant-services/:id',
+          'GET /api/consultant-services/stats',
+          'GET /api/consultant-services/search',
+          'GET /api/consultant-services/consultant/:consultantId',
+          'GET /api/consultant-services/type/:serviceType',
         ],
       });
     });
