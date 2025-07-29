@@ -8,14 +8,25 @@ import {
   registerConsultantHandler,
 } from '../controllers/authController';
 
-// Manual validation helper
+// Updated type definitions to match the schema
+type LoginRequest = z.infer<typeof loginSchema>;
+type RegisterClientRequest = z.infer<typeof registerClientSchema>;
+type RegisterConsultantRequest = z.infer<typeof registerConsultantSchema>;
+
+// Manual validation helper with better error handling
 const validateBody = <T>(schema: z.ZodSchema<T>, body: unknown): T => {
   const result = schema.safeParse(body);
   if (!result.success) {
+    const formattedErrors = result.error.errors.map(err => ({
+      field: err.path.join('.'),
+      message: err.message,
+      code: err.code
+    }));
+    
     throw {
       statusCode: 400,
       message: 'Validation failed',
-      details: result.error.errors,
+      details: formattedErrors,
     };
   }
   return result.data;
@@ -32,12 +43,16 @@ export default async function authRoutes(fastify: FastifyInstance) {
       const validatedRequest = {
         ...request,
         body: validatedBody,
-      } as FastifyRequest<{ Body: z.infer<typeof loginSchema> }>;
+      } as FastifyRequest<{ Body: LoginRequest }>;
       
       return await loginClientHandler(validatedRequest, reply);
     } catch (error: any) {
+      console.error('❌ Client login error:', error);
       if (error.statusCode) {
-        reply.status(error.statusCode).send({ error: error.message, details: error.details });
+        reply.status(error.statusCode).send({ 
+          error: error.message, 
+          details: error.details 
+        });
       } else {
         reply.status(500).send({ error: 'Internal server error' });
       }
@@ -52,12 +67,16 @@ export default async function authRoutes(fastify: FastifyInstance) {
       const validatedRequest = {
         ...request,
         body: validatedBody,
-      } as FastifyRequest<{ Body: z.infer<typeof loginSchema> }>;
+      } as FastifyRequest<{ Body: LoginRequest }>;
       
       return await loginConsultantHandler(validatedRequest, reply);
     } catch (error: any) {
+      console.error('❌ Consultant login error:', error);
       if (error.statusCode) {
-        reply.status(error.statusCode).send({ error: error.message, details: error.details });
+        reply.status(error.statusCode).send({ 
+          error: error.message, 
+          details: error.details 
+        });
       } else {
         reply.status(500).send({ error: 'Internal server error' });
       }
@@ -67,42 +86,53 @@ export default async function authRoutes(fastify: FastifyInstance) {
   // Client Registration
   fastify.post('/register-client', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      console.log('📝 Raw request body:', request.body);
+      console.log('📝 Raw client registration request body:', request.body);
       
       const validatedBody = validateBody(registerClientSchema, request.body);
-      console.log('✅ Validation passed:', validatedBody);
+      console.log('✅ Client validation passed:', validatedBody);
       
       const validatedRequest = {
         ...request,
         body: validatedBody,
-      } as FastifyRequest<{ Body: z.infer<typeof registerClientSchema> }>;
+      } as FastifyRequest<{ Body: RegisterClientRequest }>;
       
       return await registerClientHandler(validatedRequest, reply);
     } catch (error: any) {
-      console.error('❌ Registration error:', error);
+      console.error('❌ Client registration error:', error);
       if (error.statusCode) {
-        reply.status(error.statusCode).send({ error: error.message, details: error.details });
+        reply.status(error.statusCode).send({ 
+          error: error.message, 
+          details: error.details 
+        });
       } else {
         reply.status(500).send({ error: 'Internal server error' });
       }
     }
   });
 
-  // Consultant Registration
+  // Consultant Registration - FIXED
   fastify.post('/register-consultant', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
+      console.log('📝 Raw consultant registration request body:', request.body);
+      
       const validatedBody = validateBody(registerConsultantSchema, request.body);
+      console.log('✅ Consultant validation passed:', validatedBody);
       
       const validatedRequest = {
         ...request,
         body: validatedBody,
-      } as FastifyRequest<{ Body: z.infer<typeof registerConsultantSchema> }>;
+      } as FastifyRequest<{ Body: RegisterConsultantRequest }>;
       
       return await registerConsultantHandler(validatedRequest, reply);
     } catch (error: any) {
+      console.error('❌ Consultant registration error:', error);
       if (error.statusCode) {
-        reply.status(error.statusCode).send({ error: error.message, details: error.details });
+        reply.status(error.statusCode).send({ 
+          error: error.message, 
+          details: error.details 
+        });
       } else {
+        console.error('❌ Unexpected error:', error);
         reply.status(500).send({ error: 'Internal server error' });
       }
     }
@@ -122,3 +152,6 @@ export default async function authRoutes(fastify: FastifyInstance) {
     };
   });
 }
+
+// Export the types for use in controllers
+export type { LoginRequest, RegisterClientRequest, RegisterConsultantRequest };
