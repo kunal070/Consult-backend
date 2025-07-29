@@ -29,7 +29,7 @@ export interface RegisterConsultantRequest {
   preferredWorkMode: string;
   specialization: string;
   yearsOfExperience: number;
-  primarySkills: string;
+  primarySkills: string[]; // ✅ Changed from string to string[]
   availableServices: string;
   preferredWorkingHours: string;
   consultingMode: string;

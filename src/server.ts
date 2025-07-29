@@ -7,58 +7,76 @@ import { getConnection, closeConnection } from './config/database';
 
 // Import routes
 import authRoutes from './routes/auth';
-import jobPostingRoutes from './routes/jobPosting';
-import consultantServiceRoutes from './routes/consultantService';
-// import consultantRoutes from './routes/consultant';
-// import clientRoutes from './routes/client';
+import consultantRoutes from './routes/consultant';
+import clientRoutes from './routes/client';
 
-// Create Fastify instance WITHOUT ZodTypeProvider
+// Create Fastify instance with simpler logging to avoid encoding issues
 const fastify = Fastify({
   logger: {
     level: 'info',
-    transport: {
+    // Simplified logging to avoid encoding issues
+    transport: process.env.NODE_ENV === 'development' ? {
       target: 'pino-pretty',
       options: {
         colorize: true,
         translateTime: 'HH:MM:ss Z',
         ignore: 'pid,hostname',
       },
-    },
+    } : undefined,
   },
 });
 
 const start = async () => {
   try {
+    console.log('🚀 Starting ConsultMatch Backend Server...');
+    
     // Register security plugins
+    console.log('🔒 Registering security plugins...');
     await fastify.register(helmet, {
       contentSecurityPolicy: false, // Disable CSP for API
     });
+    console.log('✅ Helmet registered');
 
     // Register CORS
+    console.log('🌐 Registering CORS...');
     await fastify.register(cors, {
       origin: [config.frontend.url, 'http://localhost:5000'],
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
       allowedHeaders: ['Content-Type', 'Authorization'],
     });
+    console.log('✅ CORS registered');
 
     // Register multipart for file uploads
+    console.log('📁 Registering multipart...');
     await fastify.register(multipart, {
       limits: {
         fileSize: 10 * 1024 * 1024, // 10MB limit
       },
     });
+    console.log('✅ Multipart registered');
 
     // Test database connection on startup (non-blocking)
+    console.log('🗄️ Testing database connection...');
     try {
-      await getConnection();
-      fastify.log.info('✅ Database connection established');
-    } catch (dbError) {
-      fastify.log.warn('⚠️  Database connection failed, but server will continue:', dbError);
+      const pool = await getConnection();
+      // Simple test query
+      await pool.request().query('SELECT 1 as test');
+      console.log('✅ Database connection and query test successful');
+    } catch (dbError: any) {
+      console.warn('⚠️ Database connection failed, but server will continue:');
+      console.warn('Error details:', {
+        message: dbError.message,
+        code: dbError.code,
+        number: dbError.number,
+        state: dbError.state,
+        server: dbError.server
+      });
       // Don't throw - let server start anyway
     }
 
     // Health check route
+    console.log('🏥 Registering health check route...');
     fastify.get('/health', async (request, reply) => {
       try {
         // Test database connection
@@ -71,18 +89,21 @@ const start = async () => {
           database: 'connected',
           server: 'running',
         };
-      } catch (error) {
+      } catch (error: any) {
         reply.status(503);
         return {
           status: 'ERROR',
           timestamp: new Date().toISOString(),
           database: 'disconnected',
           error: 'Database connection failed',
+          details: error.message,
         };
       }
     });
+    console.log('✅ Health check route registered');
 
     // API Info route
+    console.log('📋 Registering API info route...');
     fastify.get('/api', async (request, reply) => {
       return {
         name: 'ConsultMatch API',
@@ -99,18 +120,59 @@ const start = async () => {
         timestamp: new Date().toISOString(),
       };
     });
+    console.log('✅ API info route registered');
 
     // Register route modules
-    await fastify.register(authRoutes, { prefix: '/api/auth' });
-    await fastify.register(jobPostingRoutes, { prefix: '/api/jobs' });
-    await fastify.register(consultantServiceRoutes, { prefix: '/api/consultant-services' });
+    console.log('🛣️ Registering auth routes...');
+    try {
+      await fastify.register(authRoutes, { prefix: '/api/auth' });
+      console.log('✅ Auth routes registered successfully');
+    } catch (routeError: any) {
+      console.error('❌ Failed to register auth routes:', {
+        message: routeError.message,
+        stack: routeError.stack,
+        name: routeError.name
+      });
+      throw routeError;
+    }
+    
+    console.log('🛣️ Registering consultant routes...');
+    try {
+      await fastify.register(consultantRoutes, { prefix: '/api/consultant' });
+      console.log('✅ Consultant routes registered successfully');
+    } catch (routeError: any) {
+      console.error('❌ Failed to register consultant routes:', {
+        message: routeError.message,
+        stack: routeError.stack,
+        name: routeError.name
+      });
+      throw routeError;
+    }
 
-    // await fastify.register(consultantRoutes, { prefix: '/api/consultant' });
-    // await fastify.register(clientRoutes, { prefix: '/api/client' });
+    console.log('🛣️ Registering client routes...');
+    try {
+      await fastify.register(clientRoutes, { prefix: '/api/client' });
+      console.log('✅ Client routes registered successfully');
+    } catch (routeError: any) {
+      console.error('❌ Failed to register client routes:', {
+        message: routeError.message,
+        stack: routeError.stack,
+        name: routeError.name
+      });
+      throw routeError;
+    }
 
     // Global error handler
+    console.log('🛡️ Setting up error handlers...');
     fastify.setErrorHandler((error, request, reply) => {
-      fastify.log.error(error);
+      console.error('❌ Global error handler triggered:', {
+        message: error.message,
+        stack: error.stack,
+        statusCode: error.statusCode,
+        validation: error.validation,
+        code: error.code,
+        name: error.name
+      });
 
       // Validation errors
       if (error.validation) {
@@ -160,40 +222,51 @@ const start = async () => {
           'POST /api/auth/login-consultant',
           'POST /api/auth/register-client',
           'POST /api/auth/register-consultant',
-          'GET /api/jobs',
-          'POST /api/jobs',
-          'GET /api/jobs/:id',
-          'PUT /api/jobs/:id',
-          'DELETE /api/jobs/:id',
-          'GET /api/jobs/stats',
-          'GET /api/jobs/search',
-          'GET /api/consultant-services',
-          'POST /api/consultant-services',
-          'GET /api/consultant-services/:id',
-          'PUT /api/consultant-services/:id',
-          'DELETE /api/consultant-services/:id',
-          'GET /api/consultant-services/stats',
-          'GET /api/consultant-services/search',
-          'GET /api/consultant-services/consultant/:consultantId',
-          'GET /api/consultant-services/type/:serviceType',
+          'GET /api/consultant/',
+          'GET /api/consultant/:id',
+          'GET /api/consultant/stats',
+          'GET /api/client/',
+          'GET /api/client/:id',
+          'GET /api/client/stats',
         ],
       });
     });
+    console.log('✅ Error handlers set up');
 
     // Start the server
+    console.log('🚀 Starting server listener...');
     await fastify.listen({
       port: config.server.port,
       host: config.server.host,
     });
 
-    console.log('🚀 ConsultMatch Backend Server Started!');
+    console.log('🎉 ConsultMatch Backend Server Started Successfully!');
     console.log(`📡 Server running on: http://localhost:${config.server.port}`);
     console.log(`💚 Health check: http://localhost:${config.server.port}/health`);
     console.log(`📋 API info: http://localhost:${config.server.port}/api`);
     console.log(`🔒 Environment: ${process.env.NODE_ENV || 'development'}`);
 
-  } catch (err) {
-    fastify.log.error('❌ Server startup failed:', err);
+  } catch (err: any) {
+    console.error('❌ Server startup failed with detailed error:');
+    console.error('Error message:', err.message);
+    console.error('Error name:', err.name);
+    console.error('Error code:', err.code);
+    console.error('Error stack:', err.stack);
+    
+    // Additional debug info
+    if (err.cause) {
+      console.error('Error cause:', err.cause);
+    }
+    
+    // Check if it's a specific type of error
+    if (err.validation) {
+      console.error('Validation errors:', err.validation);
+    }
+    
+    if (err.statusCode) {
+      console.error('Status code:', err.statusCode);
+    }
+    
     process.exit(1);
   }
 };
@@ -207,7 +280,7 @@ const gracefulShutdown = async (signal: string) => {
     await closeConnection();
     console.log('✅ Server closed successfully');
     process.exit(0);
-  } catch (err) {
+  } catch (err: any) {
     console.error('❌ Error during shutdown:', err);
     process.exit(1);
   }
@@ -219,7 +292,11 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error) => {
-  console.error('❌ Uncaught Exception:', error);
+  console.error('❌ Uncaught Exception:', {
+    message: error.message,
+    stack: error.stack,
+    name: error.name
+  });
   process.exit(1);
 });
 

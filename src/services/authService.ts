@@ -32,7 +32,7 @@ interface RegisterConsultantInput {
   preferredWorkMode: string;
   specialization: string;
   yearsOfExperience: number;
-  primarySkills: string;
+  primarySkills: string[]; // ✅ Changed from string to string[]
   availableServices: string;
   preferredWorkingHours: string;
   consultingMode: string;
@@ -175,7 +175,7 @@ export const registerConsultant = async (data: RegisterConsultantInput) => {
     .input('PreferredWorkMode', data.preferredWorkMode)
     .input('Specialization', data.specialization)
     .input('YearsOfExperience', data.yearsOfExperience)
-    .input('PrimarySkills', data.primarySkills)
+    .input('PrimarySkills', data.primarySkills.join(', '))
     .input('AvailableServices', data.availableServices)
     .input('PreferredWorkingHours', data.preferredWorkingHours)
     .input('ConsultingMode', data.consultingMode)
