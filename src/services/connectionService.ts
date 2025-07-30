@@ -2,6 +2,7 @@
 
 import { getConnection } from '../config/database';
 import sql from 'mssql';
+import { FastifyRequest, FastifyReply } from 'fastify';
 import { 
   Connection, 
   ConnectionWithUserInfo, 
@@ -13,6 +14,239 @@ import {
 } from '../types/connection';
 
 export class ConnectionService {
+  /**
+   * Get connection statistics - FIXED VERSION with better error handling
+   */
+// Enhanced Azure SQL connection configuration
+// Replace your getConnectionStats method with this Azure-optimized version
+
+static async getConnectionStats(
+  request: FastifyRequest,
+  reply: FastifyReply
+) {
+  const sql = require('mssql');
+  
+  try {
+    console.log('📊 Getting connection statistics with enhanced Azure config');
+    
+    const { config } = await import('../config/config');
+    
+    // Enhanced Azure SQL configuration
+    const azureConfig = {
+      server: config.database.server,
+      database: config.database.database,
+      user: config.database.username,
+      password: config.database.password,
+      options: {
+        encrypt: true,
+        trustServerCertificate: false,
+        enableArithAbort: true,
+        // Azure SQL specific options
+        connectTimeout: 60000,
+        requestTimeout: 60000,
+        cancelTimeout: 5000,
+        packetSize: 4096,
+        useUTC: false,
+        appName: 'ConsultMatch-Backend',
+        // Additional Azure optimizations
+        multipleActiveResultSets: false,
+        instanceName: '',
+        useColumnNames: false,
+        columnNameReplacer: null,
+        debug: {
+          packet: false,
+          data: false,
+          payload: false,
+          token: false
+        }
+      },
+      pool: {
+        max: 1,
+        min: 0,
+        idleTimeoutMillis: 30000,
+        acquireTimeoutMillis: 60000,
+        createTimeoutMillis: 30000,
+        destroyTimeoutMillis: 5000,
+        reapIntervalMillis: 1000,
+        createRetryIntervalMillis: 200
+      },
+      // Connection retry configuration
+      connectionTimeout: 60000,
+      requestTimeout: 60000,
+      // Azure SQL port (default 1433)
+      port: 1433,
+      parseJSON: true
+    };
+
+    console.log('🔄 Connecting with enhanced Azure configuration...');
+    console.log('📡 Server:', azureConfig.server);
+    console.log('🗄️ Database:', azureConfig.database);
+    console.log('👤 User:', azureConfig.user);
+    console.log('🔒 Encrypt:', azureConfig.options.encrypt);
+    console.log('⏱️ Timeout:', azureConfig.connectionTimeout);
+
+    // Create connection with retry logic
+    let connection = null;
+    let attempt = 1;
+    const maxAttempts = 3;
+    
+    while (attempt <= maxAttempts) {
+      try {
+        console.log(`🔄 Connection attempt ${attempt}/${maxAttempts}...`);
+        
+        connection = new sql.ConnectionPool(azureConfig);
+        
+        // Add connection event listeners
+        connection.on('connect', () => {
+          console.log('✅ Connection established successfully');
+        });
+        
+        connection.on('close', () => {
+          console.log('🔌 Connection closed');
+        });
+        
+        connection.on('error', (err: any) => {
+          console.error('❌ Connection error:', err);
+        });
+        
+        // Connect with timeout
+        const connectPromise = connection.connect();
+        const timeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Connection timeout after 60s')), 60000)
+        );
+        
+        await Promise.race([connectPromise, timeoutPromise]);
+        console.log(`✅ Connected successfully on attempt ${attempt}`);
+        break;
+        
+      } catch (attemptError: any) {
+        console.error(`❌ Attempt ${attempt} failed:`, {
+          message: attemptError.message,
+          code: attemptError.code,
+          name: attemptError.name
+        });
+        
+        if (connection) {
+          try {
+            await connection.close();
+          } catch (closeError) {
+            console.warn('⚠️ Error closing failed connection:', closeError);
+          }
+          connection = null;
+        }
+        
+        if (attempt === maxAttempts) {
+          throw new Error(`Failed to connect after ${maxAttempts} attempts. Last error: ${attemptError.message}`);
+        }
+        
+        // Wait before retry
+        const retryDelay = attempt * 2000; // 2s, 4s, 6s
+        console.log(`⏳ Waiting ${retryDelay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        
+        attempt++;
+      }
+    }
+    
+    if (!connection) {
+      throw new Error('Failed to establish connection');
+    }
+
+    // Test connection with simple query first
+    console.log('🔄 Testing connection with simple query...');
+    await connection.request().query('SELECT 1 as test');
+    console.log('✅ Connection test successful');
+
+    // Execute main stats query
+    console.log('🔄 Executing stats query...');
+    const result = await connection.request().query(`
+      SELECT 
+        COUNT(*) as total,
+        SUM(CASE WHEN Status = 'pending' THEN 1 ELSE 0 END) as pending,
+        SUM(CASE WHEN Status = 'accepted' THEN 1 ELSE 0 END) as accepted,
+        SUM(CASE WHEN Status = 'rejected' THEN 1 ELSE 0 END) as rejected,
+        SUM(CASE WHEN Status = 'removed' THEN 1 ELSE 0 END) as removed,
+        SUM(CASE WHEN RequesterType = 'consultant' AND ReceiverType = 'client' THEN 1 ELSE 0 END) as consultantToClient,
+        SUM(CASE WHEN RequesterType = 'client' AND ReceiverType = 'consultant' THEN 1 ELSE 0 END) as clientToConsultant,
+        SUM(CASE WHEN RequesterType = 'consultant' AND ReceiverType = 'consultant' THEN 1 ELSE 0 END) as consultantToConsultant,
+        SUM(CASE WHEN RequesterType = 'client' AND ReceiverType = 'client' THEN 1 ELSE 0 END) as clientToClient
+      FROM Connections
+    `);
+
+    console.log('✅ Stats query executed successfully');
+
+    // Close connection
+    await connection.close();
+    console.log('🔌 Connection closed successfully');
+
+    // Process results
+    const stats = result.recordset[0];
+    const responseData = {
+      totalConnections: Number(stats.total) || 0,
+      pendingRequests: Number(stats.pending) || 0,
+      acceptedConnections: Number(stats.accepted) || 0,
+      rejectedRequests: Number(stats.rejected) || 0,
+      removedConnections: Number(stats.removed) || 0,
+      byType: {
+        consultantToClient: Number(stats.consultantToClient) || 0,
+        clientToConsultant: Number(stats.clientToConsultant) || 0,
+        consultantToConsultant: Number(stats.consultantToConsultant) || 0,
+        clientToClient: Number(stats.clientToClient) || 0
+      }
+    };
+
+    console.log('📊 Final stats:', responseData);
+
+    reply.status(200).send({
+      success: true,
+      message: 'Connection statistics retrieved successfully',
+      data: responseData,
+      metadata: {
+        attempts: attempt,
+        timestamp: new Date().toISOString()
+      }
+    });
+
+  } catch (error: any) {
+    console.error('❌ Enhanced connection error:', {
+      message: error.message,
+      code: error.code,
+      name: error.name,
+      originalError: error.originalError?.message,
+      cause: error.cause?.message,
+      errno: error.cause?.errno,
+      syscall: error.cause?.syscall
+    });
+
+    reply.status(500).send({
+      success: false,
+      message: 'Azure SQL connection failed with enhanced configuration',
+      error: {
+        message: error.message,
+        code: error.code,
+        type: 'AZURE_CONNECTION_FAILURE'
+      },
+      troubleshooting: {
+        possibleCauses: [
+          'Azure SQL firewall still blocking (check all IP ranges)',
+          'Azure SQL server/database paused or unavailable',
+          'Network connectivity issues (VPN, corporate firewall)',
+          'Azure SQL connection limits reached',
+          'Incorrect connection string parameters'
+        ],
+        nextSteps: [
+          'Test connection from Azure Portal Query Editor',
+          'Check Azure SQL server status',
+          'Verify connection string in Azure Portal',
+          'Try connecting from different network',
+          'Check Azure SQL metrics for connection errors'
+        ]
+      },
+      timestamp: new Date().toISOString()
+    });
+  }
+}
+
   /**
    * Create a new connection request
    */
@@ -288,51 +522,6 @@ export class ConnectionService {
       };
     } catch (error) {
       console.error('❌ Error in getConnectionStatus:', error);
-      throw error;
-    }
-  }
-
-  /**
-   * Get connection statistics - FIXED VERSION
-   */
-  static async getConnectionStats(): Promise<ConnectionStats> {
-    try {
-      console.log('🔄 Getting fresh database connection for stats...');
-      const pool = await getConnection();
-      
-      console.log('📊 Executing connection stats query...');
-      const result = await pool.request().query(`
-        SELECT 
-          COUNT(*) as total,
-          SUM(CASE WHEN Status = 'pending' THEN 1 ELSE 0 END) as pending,
-          SUM(CASE WHEN Status = 'accepted' THEN 1 ELSE 0 END) as accepted,
-          SUM(CASE WHEN Status = 'rejected' THEN 1 ELSE 0 END) as rejected,
-          SUM(CASE WHEN Status = 'removed' THEN 1 ELSE 0 END) as removed,
-          SUM(CASE WHEN RequesterType = 'consultant' AND ReceiverType = 'client' THEN 1 ELSE 0 END) as consultantToClient,
-          SUM(CASE WHEN RequesterType = 'client' AND ReceiverType = 'consultant' THEN 1 ELSE 0 END) as clientToConsultant,
-          SUM(CASE WHEN RequesterType = 'consultant' AND ReceiverType = 'consultant' THEN 1 ELSE 0 END) as consultantToConsultant,
-          SUM(CASE WHEN RequesterType = 'client' AND ReceiverType = 'client' THEN 1 ELSE 0 END) as clientToClient
-        FROM Connections
-      `);
-
-      const stats = result.recordset[0];
-      console.log('✅ Stats query successful:', stats);
-
-      return {
-        totalConnections: stats.total || 0,
-        pendingRequests: stats.pending || 0,
-        acceptedConnections: stats.accepted || 0,
-        rejectedRequests: stats.rejected || 0,
-        removedConnections: stats.removed || 0,
-        byType: {
-          consultantToClient: stats.consultantToClient || 0,
-          clientToConsultant: stats.clientToConsultant || 0,
-          consultantToConsultant: stats.consultantToConsultant || 0,
-          clientToClient: stats.clientToClient || 0
-        }
-      };
-    } catch (error) {
-      console.error('❌ Error in getConnectionStats:', error);
       throw error;
     }
   }
