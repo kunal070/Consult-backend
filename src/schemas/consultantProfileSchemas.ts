@@ -84,7 +84,8 @@ export const validateProfileData = (data: unknown): ConsultantProfile => {
   return consultantProfileSchema.parse(data);
 };
 
-// Profile completion calculation helper
+
+// Profile completion calculation helper (if not already exists)
 export const calculateProfileCompletion = (profile: Partial<ConsultantProfile>): number => {
   let completion = 0;
   
@@ -125,4 +126,5 @@ export const calculateProfileCompletion = (profile: Partial<ConsultantProfile>):
   }
   
   return Math.min(completion, 100);
-}; 
+};
+

@@ -308,4 +308,4 @@ export const deleteAvatarHandler = async (
       )
     );
   }
-}; 
+};
