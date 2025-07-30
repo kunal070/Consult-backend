@@ -4,7 +4,9 @@ import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
 import { config } from './config/config';
 import { getConnection, closeConnection } from './config/database';
-import clientProfileRoutes from './routes/clientProfile';
+import clientProfileRoutes from './routes/clientProfile';4
+import connectionRoutes from './routes/connection';
+
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -216,6 +218,19 @@ const start = async () => {
       throw routeError;
     }
 
+     console.log('🛣️ Registering connection routes...');
+    try {
+      await fastify.register(connectionRoutes, { prefix: '/api/connections' });
+      console.log('✅ Connection routes registered successfully');
+    } catch (routeError: any) {
+      console.error('❌ Failed to register connection routes:', {
+        message: routeError.message,
+        stack: routeError.stack,
+        name: routeError.name
+      });
+      throw routeError;
+    }
+
     // Global error handler
     console.log('🛡️ Setting up error handlers...');
     fastify.setErrorHandler((error, request, reply) => {
@@ -305,6 +320,13 @@ const start = async () => {
           'GET /api/consultant/profile/completion',
           'POST /api/consultant/profile/avatar',
           'DELETE /api/consultant/profile/avatar',
+          'POST /api/connections',
+          'GET /api/connections',
+          'GET /api/connections/pending',
+          'GET /api/connections/stats',
+          'GET /api/connections/:id',
+          'PATCH /api/connections/:id',
+          'GET /api/connections/status/:userType/:userId',
         ],
       });
     });
