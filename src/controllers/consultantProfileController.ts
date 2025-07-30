@@ -6,7 +6,8 @@ import {
   deleteConsultantProfile,
   getProfileCompletion 
 } from '../services/consultantProfileService';
-import { validateProfileData, calculateProfileCompletion } from '../schemas/consultantProfileSchemas';
+import { validatePartialProfileData, UpdateProfileEmailRequest, calculateProfileCompletion } from '../schemas/consultantProfileSchemas';
+
 
 // Standard API response format
 interface ApiResponse<T = any> {
@@ -69,81 +70,6 @@ export const getProfileHandler = async (
       createResponse(
         false,
         'Failed to retrieve profile',
-        undefined,
-        error.message
-      )
-    );
-  }
-};
-
-// PUT /api/consultant/profile - Update consultant's profile
-export const updateProfileHandler = async (
-  req: FastifyRequest,
-  reply: FastifyReply
-) => {
-  try {
-    // Use default consultant ID for testing when no authentication is present
-    const consultantId = req.user?.consultantId || 15; // Default to consultant ID 15 for testing
-    console.log('📝 Updating consultant profile for ID:', consultantId);
-
-    // Validate request body
-    let validatedData;
-    try {
-      validatedData = validateProfileData(req.body);
-    } catch (validationError: any) {
-      console.error('❌ Profile validation error:', validationError);
-      
-      if (validationError.name === 'ZodError') {
-        const errors = validationError.errors.map((err: any) => ({
-          field: err.path.join('.'),
-          message: err.message
-        }));
-        
-        reply.status(400).send({
-          success: false,
-          error: 'Validation Error',
-          message: 'Invalid profile data',
-          details: errors
-        });
-        return;
-      }
-      
-      reply.status(400).send(
-        createResponse(false, 'Invalid profile data', undefined, validationError.message)
-      );
-      return;
-    }
-
-    // Update profile
-    const updatedProfile = await updateConsultantProfile(consultantId, validatedData);
-
-    // Calculate new completion percentage
-    const completion = calculateProfileCompletion(updatedProfile);
-    const profileWithCompletion = {
-      ...updatedProfile,
-      profileCompletion: completion
-    };
-
-    reply.status(200).send({
-      success: true,
-      message: 'Profile updated successfully',
-      profile: profileWithCompletion
-    });
-
-  } catch (error: any) {
-    console.error('❌ Error updating consultant profile:', error);
-    
-    if (error.message?.includes('duplicate') || error.message?.includes('unique')) {
-      reply.status(409).send(
-        createResponse(false, 'Profile with this information already exists')
-      );
-      return;
-    }
-    
-    reply.status(500).send(
-      createResponse(
-        false,
-        'Failed to update profile',
         undefined,
         error.message
       )
@@ -303,6 +229,119 @@ export const deleteAvatarHandler = async (
       createResponse(
         false,
         'Failed to delete avatar',
+        undefined,
+        error.message
+      )
+    );
+  }
+};
+
+
+export const updateProfileHandler = async (
+   req: FastifyRequest<{ 
+    Params: { id: string };  // ← ADD THIS LINE
+    Body: UpdateProfileEmailRequest 
+  }>,
+  reply: FastifyReply
+) => {
+  try {
+    const consultantId = parseInt(req.params.id);
+    console.log('📝 Updating consultant profile for ID:', consultantId);
+    console.log('📧 Request body:', req.body);
+
+    // Validate partial data (email-focused)
+    let validatedData;
+    try {
+      validatedData = validatePartialProfileData(req.body);
+      console.log('✅ Validated data:', validatedData);
+    } catch (validationError: any) {
+      console.error('❌ Profile validation error:', validationError);
+      
+      if (validationError.name === 'ZodError') {
+        const errors = validationError.errors.map((err: any) => ({
+          field: err.path.join('.'),
+          message: err.message
+        }));
+        
+        reply.status(400).send({
+          success: false,
+          error: 'Validation Error',
+          message: 'Invalid profile data',
+          details: errors
+        });
+        return;
+      }
+      
+      reply.status(400).send(
+        createResponse(false, 'Invalid profile data', undefined, validationError.message)
+      );
+      return;
+    }
+
+    // Check if any fields are provided for update
+    if (Object.keys(validatedData).length === 0) {
+      reply.status(400).send(
+        createResponse(false, 'No fields provided for update')
+      );
+      return;
+    }
+
+    // Special handling for email updates (check uniqueness if email is being changed)
+    if (validatedData.email) {
+      console.log('📧 Email update requested:', validatedData.email);
+      
+      // Optional: Add email uniqueness check here
+      // const existingProfile = await getConsultantProfile(consultantId);
+      // if (existingProfile && existingProfile.email !== validatedData.email) {
+      //   // Check if new email already exists for another consultant
+      // }
+    }
+
+    // Update profile
+    const updatedProfile = await updateConsultantProfile(consultantId, validatedData);
+
+    // Calculate new completion percentage
+    const completion = calculateProfileCompletion(updatedProfile);
+    const profileWithCompletion = {
+      ...updatedProfile,
+      profileCompletion: completion
+    };
+
+    // Response with what was actually updated
+    const updatedFields = Object.keys(validatedData);
+    const isEmailUpdated = updatedFields.includes('email');
+
+    reply.status(200).send({
+      success: true,
+      message: isEmailUpdated ? 
+        'Profile updated successfully. Email has been changed.' : 
+        'Profile updated successfully.',
+      profile: profileWithCompletion,
+      updatedFields,
+      emailUpdated: isEmailUpdated
+    });
+
+  } catch (error: any) {
+    console.error('❌ Error updating consultant profile:', error);
+    
+    if (error.message?.includes('not found')) {
+      reply.status(404).send(
+        createResponse(false, 'Consultant not found')
+      );
+      return;
+    }
+    
+    if (error.message?.includes('duplicate') || error.message?.includes('unique')) {
+      reply.status(409).send(
+        createResponse(false, 'Email already exists for another consultant')
+      );
+      return;
+    }
+    
+    reply.status(500).send(
+      createResponse(
+        false,
+        'Failed to update profile',
         undefined,
         error.message
       )

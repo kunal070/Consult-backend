@@ -73,9 +73,9 @@ export const loginClient = async (data: LoginInput) => {
   return {
     message: 'Login successful',
     user: {
-      id: user.Id,
+      id: user.ClientID,
       email: user.Email,
-      name: user.Name,
+      name: user.FullName,
     },
   };
 };
