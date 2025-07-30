@@ -9,6 +9,9 @@ import { getConnection, closeConnection } from './config/database';
 import authRoutes from './routes/auth';
 import consultantRoutes from './routes/consultant';
 import clientRoutes from './routes/client';
+import jobPostingRoutes from './routes/jobPosting';
+import consultantServiceRoutes from './routes/consultantService';
+import consultantProfileRoutes from './routes/consultantProfile';
 
 // Create Fastify instance with simpler logging to avoid encoding issues
 const fastify = Fastify({
@@ -115,6 +118,7 @@ const start = async () => {
           jobs: '/api/jobs/*',
           consultantServices: '/api/consultant-services/*',
           consultant: '/api/consultant/*',
+          consultantProfile: '/api/consultant/profile/*',
           client: '/api/client/*',
         },
         timestamp: new Date().toISOString(),
@@ -155,6 +159,45 @@ const start = async () => {
       console.log('✅ Client routes registered successfully');
     } catch (routeError: any) {
       console.error('❌ Failed to register client routes:', {
+        message: routeError.message,
+        stack: routeError.stack,
+        name: routeError.name
+      });
+      throw routeError;
+    }
+
+    console.log('🛣️ Registering job posting routes...');
+    try {
+      await fastify.register(jobPostingRoutes, { prefix: '/api/jobs' });
+      console.log('✅ Job posting routes registered successfully');
+    } catch (routeError: any) {
+      console.error('❌ Failed to register job posting routes:', {
+        message: routeError.message,
+        stack: routeError.stack,
+        name: routeError.name
+      });
+      throw routeError;
+    }
+
+    console.log('🛣️ Registering consultant service routes...');
+    try {
+      await fastify.register(consultantServiceRoutes, { prefix: '/api/consultant-services' });
+      console.log('✅ Consultant service routes registered successfully');
+    } catch (routeError: any) {
+      console.error('❌ Failed to register consultant service routes:', {
+        message: routeError.message,
+        stack: routeError.stack,
+        name: routeError.name
+      });
+      throw routeError;
+    }
+
+    console.log('🛣️ Registering consultant profile routes...');
+    try {
+      await fastify.register(consultantProfileRoutes, { prefix: '/api/consultant/profile' });
+      console.log('✅ Consultant profile routes registered successfully');
+    } catch (routeError: any) {
+      console.error('❌ Failed to register consultant profile routes:', {
         message: routeError.message,
         stack: routeError.stack,
         name: routeError.name
@@ -228,6 +271,26 @@ const start = async () => {
           'GET /api/client/',
           'GET /api/client/:id',
           'GET /api/client/stats',
+          'GET /api/jobs/',
+          'GET /api/jobs/:id',
+          'GET /api/jobs/stats',
+          'GET /api/jobs/search',
+          'POST /api/jobs/',
+          'PUT /api/jobs/:id',
+          'DELETE /api/jobs/:id',
+          'GET /api/consultant-services/',
+          'GET /api/consultant-services/:id',
+          'GET /api/consultant-services/stats',
+          'GET /api/consultant-services/search',
+          'POST /api/consultant-services/',
+          'PUT /api/consultant-services/:id',
+          'DELETE /api/consultant-services/:id',
+          'GET /api/consultant/profile',
+          'PUT /api/consultant/profile',
+          'DELETE /api/consultant/profile',
+          'GET /api/consultant/profile/completion',
+          'POST /api/consultant/profile/avatar',
+          'DELETE /api/consultant/profile/avatar',
         ],
       });
     });
