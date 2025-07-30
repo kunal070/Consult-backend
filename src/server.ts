@@ -13,7 +13,7 @@ import jobPostingRoutes from './routes/jobPosting';
 import consultantServiceRoutes from './routes/consultantService';
 import consultantProfileRoutes from './routes/consultantProfile';
 
-// Create Fastify instance with simpler logging to avoid encoding issues
+// Create Fastify instance with simpler logging to avoid encoding issuess
 const fastify = Fastify({
   logger: {
     level: 'info',
