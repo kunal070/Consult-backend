@@ -1,5 +1,7 @@
 import bcrypt from 'bcrypt';
+import jwt from 'jsonwebtoken';
 import { getConnection } from '../config/database';
+import { config } from '../config/config';
 
 interface LoginInput {
   email: string;
