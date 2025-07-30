@@ -4,6 +4,7 @@ import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
 import { config } from './config/config';
 import { getConnection, closeConnection } from './config/database';
+import clientProfileRoutes from './routes/clientProfile';
 
 // Import routes
 import authRoutes from './routes/auth';
@@ -192,6 +193,16 @@ const start = async () => {
       throw routeError;
     }
 
+
+        console.log('🛣️ Registering client profile routes...');
+    try {
+      await fastify.register(clientProfileRoutes, { prefix: '/api/client/profile' });
+      console.log('✅ Client profile routes registered successfully');
+    } catch (routeError: any) {
+      console.error('❌ Failed to register client profile routes:', routeError);
+      throw routeError;
+}
+
     console.log('🛣️ Registering consultant profile routes...');
     try {
       await fastify.register(consultantProfileRoutes, { prefix: '/api/consultant/profile' });
@@ -252,6 +263,9 @@ const start = async () => {
         ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
       });
     });
+
+
+
 
     // 404 handler
     fastify.setNotFoundHandler((request, reply) => {

@@ -84,7 +84,8 @@ export const validateProfileData = (data: unknown): ConsultantProfile => {
   return consultantProfileSchema.parse(data);
 };
 
-// Profile completion calculation helper
+
+// Profile completion calculation helper (if not already exists)
 export const calculateProfileCompletion = (profile: Partial<ConsultantProfile>): number => {
   let completion = 0;
   
@@ -125,4 +126,38 @@ export const calculateProfileCompletion = (profile: Partial<ConsultantProfile>):
   }
   
   return Math.min(completion, 100);
-}; 
+};
+
+  // NEW: Email-focused update schema
+export const updateProfileEmailSchema = z.object({
+  // Email is the primary field that can be updated
+  email: z.string().email('Invalid email format').optional(),
+  
+  // All other fields are completely optional
+  fullName: z.string().min(1, 'Full name is required').max(100, 'Full name too long').optional(),
+  phoneNumber: z.string().min(1, 'Phone number is required').optional(),
+  location: z.string().min(1, 'Location is required').optional(),
+  preferredWorkType: z.string().optional(),
+  preferredWorkMode: z.string().optional(),
+  languagesSpoken: z.array(z.string()).optional(),
+  specialization: z.string().optional(),
+  yearsOfExperience: z.string().optional(),
+  education: z.array(educationSchema).optional(),
+  certificates: z.array(certificateSchema).optional(),
+  professionalExperience: z.array(professionalExperienceSchema).optional(),
+  primarySkills: z.array(z.string()).optional(),
+  availableServices: z.array(z.string()).optional(),
+  preferredWorkingHours: z.string().optional(),
+  consultingMode: z.string().optional(),
+  pricingStructure: z.string().optional(),
+  paymentPreferences: z.string().optional(),
+  briefBio: z.string().optional(),
+});
+
+// Export the type
+export type UpdateProfileEmailRequest = z.infer<typeof updateProfileEmailSchema>;
+
+// Updated validation helper
+export const validatePartialProfileData = (data: unknown): Partial<ConsultantProfile> => {
+  return updateProfileEmailSchema.parse(data);
+};

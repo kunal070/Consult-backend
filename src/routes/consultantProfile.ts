@@ -121,96 +121,50 @@ export default async function consultantProfileRoutes(fastify: FastifyInstance) 
   }, getProfileHandler);
   console.log('✅ Get consultant profile route registered');
 
-  // PUT /api/consultant/profile - Update consultant's profile
-  fastify.put('/', {
-    schema: {
-      description: 'Update consultant profile',
-      tags: ['Consultant Profile'],
-      body: {
+// Update the PUT route schema:
+fastify.put('/:id', {
+  schema: {
+    description: 'Update consultant profile (email-focused partial update)',
+    tags: ['Consultant Profile'],
+    body: {
+      type: 'object',
+      properties: {
+        // Email is the primary editable field
+        email: { 
+          type: 'string', 
+          format: 'email',
+          description: 'Primary field for profile updates'
+        },
+        
+        // All other fields are optional
+        fullName: { type: 'string', minLength: 1, maxLength: 100 },
+        phoneNumber: { type: 'string' },
+        location: { type: 'string' },
+        preferredWorkType: { type: 'string' },
+        preferredWorkMode: { type: 'string' },
+        languagesSpoken: { type: 'array', items: { type: 'string' } },
+        specialization: { type: 'string' },
+        yearsOfExperience: { type: 'string' },
+        // ... other optional fields
+        briefBio: { type: 'string' }
+      },
+      // NO required fields - everything is optional for partial updates
+      additionalProperties: false
+    },
+    response: {
+      200: {
         type: 'object',
         properties: {
-          fullName: { type: 'string', minLength: 1, maxLength: 100 },
-          email: { type: 'string', format: 'email' },
-          phoneNumber: { type: 'string', minLength: 1 },
-          location: { type: 'string', minLength: 1 },
-          preferredWorkType: { type: 'string' },
-          preferredWorkMode: { type: 'string' },
-          languagesSpoken: { type: 'array', items: { type: 'string' }, minItems: 1 },
-          specialization: { type: 'string', minLength: 1 },
-          yearsOfExperience: { type: 'string', minLength: 1 },
-          education: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                degree: { type: 'string', minLength: 1 },
-                institution: { type: 'string', minLength: 1 },
-                year: { type: 'string', minLength: 1 }
-              },
-              required: ['degree', 'institution', 'year']
-            }
-          },
-          certificates: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                name: { type: 'string', minLength: 1 }
-              },
-              required: ['name']
-            }
-          },
-          professionalExperience: {
-            type: 'array',
-            items: {
-              type: 'object',
-              properties: {
-                role: { type: 'string', minLength: 1 },
-                company: { type: 'string', minLength: 1 },
-                years: { type: 'string', minLength: 1 }
-              },
-              required: ['role', 'company', 'years']
-            }
-          },
-          primarySkills: { type: 'array', items: { type: 'string' }, minItems: 1 },
-          availableServices: { type: 'array', items: { type: 'string' }, minItems: 1 },
-          preferredWorkingHours: { type: 'string' },
-          consultingMode: { type: 'string' },
-          pricingStructure: { type: 'string' },
-          paymentPreferences: { type: 'string' },
-          briefBio: { type: 'string' }
-        }
-      },
-      response: {
-        200: {
-          type: 'object',
-          properties: {
-            success: { type: 'boolean' },
-            message: { type: 'string' },
-            profile: { type: 'object' }
-          }
-        },
-        400: {
-          type: 'object',
-          properties: {
-            success: { type: 'boolean' },
-            error: { type: 'string' },
-            message: { type: 'string' },
-            details: { type: 'array' }
-          }
-        },
-        401: {
-          type: 'object',
-          properties: {
-            success: { type: 'boolean' },
-            error: { type: 'string' },
-            message: { type: 'string' }
-          }
+          success: { type: 'boolean' },
+          message: { type: 'string' },
+          profile: { type: 'object' },
+          updatedFields: { type: 'array', items: { type: 'string' } },
+          emailUpdated: { type: 'boolean' }
         }
       }
     }
-  }, updateProfileHandler);
-  console.log('✅ Update consultant profile route registered');
+  }
+}, updateProfileHandler);
 
   // DELETE /api/consultant/profile - Delete consultant's profile (soft delete)
   fastify.delete('/', {
